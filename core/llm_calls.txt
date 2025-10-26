@@ -1,0 +1,173 @@
+### ollama
+
+    prompt = f"""
+            You are a recommendation engine.
+
+            Context:
+            - User feels: "{emotion}"
+            - Available installed apps (format: category | name | path):
+            {available_apps!r}
+
+            Goal:
+            Generate EXACTLY 3 mood-improvement suggestions, each consisting of:
+            - recommendation: A phrase of exactly FOUR words.
+            - recommendation_options: An array of EXACTLY 2 options per recommendation. Each option must include:
+                - app_name: (string)
+                - app_url: (either a valid HTTPS URL for web apps OR local file path for installed apps)
+                - search_query: (string, required only for web apps)
+                - is_local: (true if app is installed locally, false if web)
+
+            STRICT RULES:
+            1. Output ONLY valid JSON — no extra text, no explanations, no markdown.
+            2. JSON format: An array of 3 objects with keys: recommendation, recommendation_options.
+            3. Each recommendation must have TWO different apps (no duplicates across or within).
+            4. Prefer local apps over web apps if available.
+            5. For web apps:
+            - All URLs must start with "https://".
+            - Use "<search_query>" placeholder in the app_url instead of inserting actual query.
+            - Example web apps are YouTube, Spotify, Online Game (https://poki.com/), MyFlixer (https://myflixerz.to/).
+            6. For local apps:
+            - Use given path as app_url and set is_local = true.
+            - search_query is empty
+            7. Don't use same app in multiple recommendations.
+            8. Each recommendation must be exactly 4 words, meaningful, and mood-impro
+            
+
+            Example of expected structure (do NOT include this in response):
+            [
+            {{
+                "recommendation": "Take a quick break",
+                "recommendation_options": [
+                {{
+                    "app_name": "Spotify",
+                    "app_url": "https://open.spotify.com/search/<search_query>",
+                    "search_query": "relaxing music",
+                    "is_local": false
+                }},
+                {{
+                    "app_name": "KMPlayer",
+                    "app_url": "C:\\\\Program Files\\\\KMPlayer 64X\\\\KMPlayer.exe",
+                    "search_query": "",
+                    "is_local": true
+                }}
+                ]
+            }}
+            ]
+
+            Now, produce the final JSON output:
+            """
+
+
+    full_schema = RecommendationList.model_json_schema()
+
+    try:
+        
+
+        schema = {
+            "type": "object",
+                    "properties": {
+                        "listofRecommendations": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "recommendation": {"type": "string"},
+                                    "recommendation_options": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "app_name": {"type": "string"},
+                                                "app_url": {"type": "string"},
+                                                "search_query": {"type": "string"},
+                                                "is_local": {"type": "boolean"}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+            }
+
+        res = requests.post(
+             "https://d53cb0fd37cb.ngrok-free.app/api/generate",  # Use local endpoint
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": "qwen3:4b",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.2},
+                "format": schema    
+            }
+        )
+
+
+        print("[Agent] API response:", res.json())
+        if res.status_code != 200:
+            print(f"[Agent] API returned status {res.status_code}: {res.text[:200]}")
+            return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        raw_content = res.json()["response"]
+        print("Raw Response Content:", raw_content)
+
+
+## Openrouter
+# res = requests.post(
+        #     url="https://openrouter.ai/api/v1/chat/completions",
+        #     headers={
+        #         "Authorization": f"Bearer {QWEN_API_KEY}",
+        #         "Content-Type": "application/json"
+        #     },
+        #     data=json.dumps({
+        #         "model": "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        #         "messages": [
+        #             {"role": "system", "content": "You are an assistant. Output must be valid JSON only."},
+        #             {"role": "user", "content": prompt}
+        #         ],
+        #         "response_format": {
+        #             "type": "json_schema",
+        #             "json_schema": {
+        #                 "name": "recommendation_list",
+        #                 "strict": True,
+        #                 "schema": full_schema
+        #             }
+        #         },
+        #         "structured_outputs": True
+        #     }
+        # ))
+
+
+## OPENAI
+
+from openai import OpenAI
+from pydantic import BaseModel
+
+client = OpenAI()
+        
+        response = client.responses.parse(
+            model="gpt-4o-2024-08-06",
+            input=[
+                {"role": "system", "content": "Give the proper structured output."},
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            text_format=RecommendationList,
+        )
+
+        print("[Agent] API response:", response.output_parsed)
+
+        resp_data = response.output_parsed
+
+        # Extract recommendations
+        recommendations_list = [rec.recommendation for rec in resp_data.listofRecommendations]
+        recommendation_options_list = [rec.recommendation_options for rec in resp_data.listofRecommendations]
+
+        print("Final Recommendations:", recommendations_list)
+        print("Options:", recommendation_options_list)        
+        
+        # Update state
+        state.recommendation = recommendations_list
+        state.recommendation_options = recommendation_options_list
