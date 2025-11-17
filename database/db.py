@@ -2,7 +2,34 @@
 import sqlite3
 import os
 from typing import List, Tuple
-DB_PATH = r"assets\app.db"
+import uuid
+import csv
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))  # C:/project/database
+
+# # Navigate up one level and then into assets
+# db_path = os.path.join(current_dir, '..', 'assets', 'app.db')
+
+# # Normalize the path (handles the ..)
+# DB_PATH = os.path.normpath(db_path)
+
+def get_persistent_db_path():
+    # Detect base directory of app.exe or script
+    if getattr(sys, 'frozen', False):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Use user-specific folder for data storage
+    local_appdata = os.getenv('LOCALAPPDATA', app_dir)
+    emoify_data_dir = os.path.join(local_appdata, 'Emoify')
+    os.makedirs(emoify_data_dir, exist_ok=True)
+
+    # Permanent DB location
+    return os.path.join(emoify_data_dir, 'app.db')
+
+DB_PATH = get_persistent_db_path()
 
 def initialize_db():
     if not os.path.exists("assets"):
@@ -15,7 +42,40 @@ def initialize_db():
     emotions(conn)
     apps(conn)
     agent_recommendations(conn)
+    motivation_db(conn)
+    motivation_data_initial_add(conn)
     return conn
+
+def motivation_db(conn):
+    query = """
+    CREATE TABLE IF NOT EXISTS motivations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        author TEXT NOT NULL,
+        quote TEXT NOT NULL,
+        tags TEXT
+    );
+    """
+    conn.execute(query)
+    conn.commit()
+
+def motivation_data_initial_add(conn):
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM motivations")
+    count = cursor.fetchone()[0]
+
+    if count == 0:
+        with open(os.path.join(current_dir, '..', 'assets', 'quotes_dataset.csv'), 'r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)
+            for row in reader:
+                if len(row) >= 3:
+                    quote, author, tags = row[0], row[1], row[2]
+                    cursor.execute("INSERT INTO motivations (author, quote, tags) VALUES (?, ?, ?)", (author, quote, tags))
+        conn.commit()
+    conn.close()
+
+    print("[Info] Motivation quotes added to the database.")
 
 def data_initialization():
     if not os.path.exists("assets"):
@@ -23,7 +83,6 @@ def data_initialization():
     conn = sqlite3.connect(DB_PATH)
     add_emotions(conn)
     add_initial_apps(conn)
-    initial_settings()
     return conn
 
 def get_connection():
@@ -52,6 +111,37 @@ def get_user_by_id(user_id: int):
     conn.close()
     return user
 
+def create_new_user_database(username: str, phonenumber: str, birthday: str):
+    user_id = 1
+    session_id = str(uuid.uuid4())
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO users (id, username, phonenumber, birthday, session_id)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, username, phonenumber, birthday, session_id))
+    conn.commit()
+    conn.close()
+
+def get_user_by_id(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+def check_user_by_id(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if(user):
+        return user
+    return None
+
 def get_user_by_credentials(username: str, password: str):
     conn = get_connection()
     cursor = conn.cursor()
@@ -73,7 +163,6 @@ def app_settings(conn):
     conn.execute(query)
     conn.commit()
 
-#convert the value to integer
 def get_app_setting(setting_name, default_value):
     conn = get_connection()
     cursor = conn.cursor()
@@ -82,7 +171,7 @@ def get_app_setting(setting_name, default_value):
     conn.close()
     if result:
         try:
-            return int(result[0])
+            return float(result[0])
         except ValueError:
             return default_value
     return default_value
@@ -126,7 +215,6 @@ def add_agent_recommendations(conn, user_id, recommendation_type, recommed_app, 
     print(f"[Info] Added agent recommendation for user {user_id}: {recommed_app}")
     conn.commit()
 
-
 def recommendation_history(conn):
     query = """
     CREATE TABLE IF NOT EXISTS recommendation_history (
@@ -168,8 +256,24 @@ def emotions(conn):
     """
     conn.execute(query)
     conn.commit()
-    
 
+def apps(conn):
+    query = """
+    CREATE TABLE IF NOT EXISTS apps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        category TEXT NOT NULL CHECK(category IN (
+            'Songs', 'Entertainment', 'SocialMedia', 'Games', 'Communication', 'Help', 'Other')),
+        app_name TEXT NOT NULL,
+        app_url TEXT,
+        path TEXT,
+        is_local BOOLEAN NOT NULL,
+        is_available BOOLEAN NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    );
+    """
+    conn.execute(query)
+    conn.commit()
 
 
 # Add emotion function
@@ -191,39 +295,14 @@ def add_emotions(conn):
         cursor.execute("INSERT INTO emotions (emotion, is_positive) VALUES (?, ?)", (emotion, is_positive))
     conn.commit()
 
-def add_app_data(conn, user_id, category, app_name, app_id, app_url, path, is_local, app_type):
+def add_app_data(conn, user_id, category, app_name, app_url, path, is_local):
+    is_available = True
     cursor = conn.cursor()
     cursor.execute("""
-            INSERT INTO apps (user_id, category, app_name, app_id, app_url, path, is_local, app_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, category, app_name, app_id, app_url, path, is_local, app_type))
+            INSERT INTO apps (user_id, category, app_name, app_url, path, is_local, is_available)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, category, app_name, app_url, path, is_local, is_available))
     conn.commit()
-
-# get app_type, app_name and app_id only
-def get_app_data(conn, app_name):
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT app_type, app_name, app_id, path
-        FROM apps
-        WHERE app_name = ? AND is_local = 1
-    """, (app_name,))
-    row = cursor.fetchone()
-
-    if row:
-        return {
-            "app_type": row[0],
-            "name": row[1],
-            "app_id": row[2],
-            "path": row[3]
-        }
-    else:
-        return {
-            "app_type": "Unknown",
-            "name": app_name,
-            "app_id": None,
-            "path": None
-        }
-
 
 def delete_app_data(conn, app_id: int):
     """
@@ -236,61 +315,60 @@ def delete_app_data(conn, app_id: int):
     cursor.execute("DELETE FROM apps WHERE id = ?", (app_id,))
     conn.commit()
 
-
-def apps(conn):
-    query = """
-    CREATE TABLE IF NOT EXISTS apps (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        category TEXT NOT NULL CHECK(category IN (
-            'Songs', 'Entertainment', 'SocialMedia', 'Games', 'Communication', 'Help', 'Other')),
-        app_name TEXT NOT NULL,
-        app_id TEXT,
-        app_url TEXT,
-        path TEXT,
-        is_local BOOLEAN NOT NULL,
-        app_type TEXT NOT NULL CHECK(app_type IN ('uwp', 'classic','web')),
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    );
-    """
-    conn.execute(query)
-    conn.commit()
-
 def add_initial_apps(conn):
     """
     Adds initial apps to the database.
     """
     initial_apps = [
-        (1, 'Games', 'Subway Surfers', None, 'https://poki.com/en/g/subway-surfers', None, False, 'web'),
-        (1, 'Games', 'Brain Test', None, 'https://poki.com/en/g/brain-test-tricky-puzzles', None, False, 'web'),
-        (1, 'Games', 'Bike Game', None, 'https://poki.com/en/g/stunt-bike-extreme', None, False, 'web'),
-        (1, 'Entertainment', 'YouTube', None, 'https://www.youtube.com', None, False, 'web'),
-        (1, 'Entertainment', 'Films', None, 'https://myflixerz.to/', None, False, 'web'),
-        (1, 'Songs', 'Spotify', None, 'https://open.spotify.com/', None, False, 'web'),
-        (1, 'Songs', 'SoundCloud', None, 'https://soundcloud.com/', None, False, 'web'),
-        (1, 'SocialMedia', 'WhatsApp', None, 'https://web.whatsapp.com/', None, False, 'web'),
-        (1, 'SocialMedia', 'Facebook', None, 'https://www.facebook.com/', None, False, 'web'),
-        (1, 'Help', 'ChatGPT', None, 'https://chatgpt.com/', None, False, 'web'),
-        (1, 'Help', 'Perplexity', None, 'https://www.perplexity.ai/', None, False, 'web')
-
+        # Add a 7th value for 'is_available'
+        (1, 'Games', 'Subway Surfers', None, 'https://poki.com/en/g/subway-surfers', False, 1),
+        (1, 'Games', 'Brain Test', None, 'https://poki.com/en/g/brain-test-tricky-puzzles', False, 1),
+        (1, 'Games', 'Bike Game', None, 'https://poki.com/en/g/stunt-bike-extreme', False, 1),
+        (1, 'Entertainment', 'YouTube', None, 'https://www.youtube.com', False, 1),
+        (1, 'Entertainment', 'Films', None, 'https://myflixerz.to/', False, 1),
+        (1, 'Songs', 'Spotify', None, 'https://open.spotify.com/', False, 1),
+        (1, 'Songs', 'SoundCloud', None, 'https://soundcloud.com/', False, 1),
+        (1, 'SocialMedia', 'WhatsApp', None, 'https://web.whatsapp.com/', False, 1),
+        (1, 'SocialMedia', 'Facebook', None, 'https://www.facebook.com/', False, 1),
+        (1, 'Help', 'ChatGPT', None, 'https://chatgpt.com/', False, 1),
+        (1, 'Help', 'Perplexity', None, 'https://www.perplexity.ai/', False, 1)
     ]
 
-    cursor = conn.cursor()
-    cursor.executemany("""
-        INSERT INTO apps (user_id, category, app_name, app_id, app_url, path, is_local, app_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    conn.executemany("""
+        INSERT INTO apps (user_id, category, app_name, app_url, path, is_local, is_available)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     """, initial_apps)
     conn.commit()
 
 def get_apps(conn) -> List[Tuple]:
     """
-    Fetches most recent 10 apps from the database .
+    Fetches most recent 10 apps from the database.
 
     """
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM apps ORDER BY id DESC LIMIT 10")
+    cursor.execute("SELECT * FROM apps WHERE is_available = 1 ORDER BY id DESC LIMIT 10")
     all_data = cursor.fetchall()
-    print("[App Data]:", all_data)
     # get name, category and path only
-    filtered_data = [(row[2], row[3], row[4], row[6]) for row in all_data]
+    filtered_data = [(row[2], row[3], row[5]) for row in all_data]
     return filtered_data
+
+# get app_type, app_name and app_id only
+def get_app_data(conn, app_name):
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT app_name, path
+        FROM apps
+        WHERE app_name = ? AND is_local = 1
+    """, (app_name,))
+    row = cursor.fetchone()
+
+    if row:
+        return {
+            "name": row[0],
+            "path": row[1]
+        }
+    else:
+        return {
+            "name": app_name,
+            "path": None
+        }

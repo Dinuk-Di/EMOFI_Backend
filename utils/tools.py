@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import time
 import threading
 import webbrowser
@@ -464,3 +465,8 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
             return False, None, None
             
     return False, None, None
+
+def resource_path(rel_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller bundle """
+    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+    return os.path.join(base_path, rel_path)

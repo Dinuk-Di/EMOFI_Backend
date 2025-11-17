@@ -1,6 +1,33 @@
 import sqlite3
+import os
+import sys
 
-database = r'assets\app.db'
+from flask import jsonify
+
+# current_dir = os.path.dirname(os.path.abspath(__file__))  # C:/project/database
+
+# # Navigate up one level and then into assets
+# db_path = os.path.join(current_dir, '..', 'assets', 'app.db')
+
+# # Normalize the path (handles the ..)
+# database = os.path.normpath(db_path)
+
+def get_persistent_db_path():
+    # Detect base directory of app.exe or script
+    if getattr(sys, 'frozen', False):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Use user-specific folder for data storage
+    local_appdata = os.getenv('LOCALAPPDATA', app_dir)
+    emoify_data_dir = os.path.join(local_appdata, 'Emoify')
+    os.makedirs(emoify_data_dir, exist_ok=True)
+
+    # Permanent DB location
+    return os.path.join(emoify_data_dir, 'app.db')
+
+database = get_persistent_db_path()
 
 def init_db():
     conn = sqlite3.connect(database)
@@ -13,11 +40,12 @@ def init_db():
     conn.close()
 
 def save_UserData(userName, password, phoneNumber):
+    user_id = 1
     conn = sqlite3.connect(database)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO Users (userName, password, phoneNumber) VALUES (?, ?, ?)", 
-        (userName, password, phoneNumber)
+        "INSERT INTO Users (id, userName, password, phoneNumber) VALUES (?, ?, ?, ?)", 
+        (user_id, userName, password, phoneNumber)
     )
     conn.commit()
     conn.close()
@@ -47,3 +75,37 @@ def set_user_settings(userID, setting_name, setting_value):
     conn.commit()
     conn.close()
     return True
+
+def set_user_settings_initial():
+    user_id = 1  # Assuming you want to set initial settings for user with ID 1
+    default_settings = {
+        "theme": "light",
+        "systemDisable": "false",
+        "recommendationTime": "5",
+        "restTime": "10",
+        "appExecuteTime": "10",
+        "soundLevel": "Mid"
+    }
+    conn = sqlite3.connect(database)
+    c = conn.cursor()
+    for setting_name, setting_value in default_settings.items():
+        c.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)",
+                  (user_id, setting_name, setting_value))
+    conn.commit()
+    conn.close()
+
+def get_all_apps():
+    user_id = 1  # Assuming you want to fetch apps for user with ID 1
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT app_name as name, path, category, is_local as isLocal, is_available as isAvailable
+        FROM apps 
+        WHERE user_id = ?
+    """, (user_id,))
+    
+    apps = cursor.fetchall()
+    conn.close()
+
+    return apps

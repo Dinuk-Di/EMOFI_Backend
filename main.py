@@ -1,6 +1,5 @@
 import sys
 import subprocess
-from customtkinter import CTk
 from tkinter import messagebox
 from database.db import get_connection
 from database.db import initialize_db
@@ -53,6 +52,7 @@ def main():
     # Connect to database and try to fetch user info
     conn = get_connection()
     cursor = conn.cursor()
+    initialize_db()
     cursor.execute("SELECT username, session_id FROM users WHERE id = 1")
     user_data = cursor.fetchone()
 
