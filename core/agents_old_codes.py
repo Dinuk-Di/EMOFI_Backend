@@ -32,8 +32,6 @@ import sys         # For finding the current Python executable
 from utils.rl_model import load_bandit_model,featurize_context,get_action_features
 from utils.for_rl import log_training_data, show_feedback_dialog
 
-from utils.models import AppRecommendation
-
 load_dotenv()
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
@@ -92,12 +90,11 @@ def run_agent_system(emotions):
     
     return agent_workflow.invoke(initial_state, config=config)
 
-
-# class AppRecommendation(BaseModel):
-#     app_name: str = Field(description="Name of recommended application")
-#     app_url: str = Field(description="URL or local path of the application")
-#     search_query: str = Field(description="Search query if web-based application")
-#     is_local: bool = Field(default=False, description="Whether the app is a local executable")
+class AppRecommendation(BaseModel):
+    app_name: str = Field(description="Name of recommended application")
+    app_url: str = Field(description="URL or local path of the application")
+    search_query: str = Field(description="Search query if web-based application")
+    is_local: bool = Field(default=False, description="Whether the app is a local executable")
 
 class RecommendationResponse(BaseModel):
     recommendation: str = Field(description="4-word mood improvement suggestions")
@@ -119,7 +116,7 @@ class AgentState(BaseModel):
     continue_waiting: Optional[bool] = None
     wait_start_time: Optional[float] = None  # Track when waiting began
 
-    chosen_action: Optional[AppRecommendation] = None           # The app the user clicked on
+    chosen_action: Optional[Dict] = None           # The app the user clicked on
     context_at_recommendation: Optional[Dict] = None # The context (emotion, time)
 
 
@@ -375,7 +372,6 @@ def recommendation_agent(state):
                 - app_url: (either a valid HTTPS URL for web apps OR local file path or app_id for installed apps)
                 - search_query: (string, required only for web apps)
                 - is_local: (true if app is installed locally, false if web)
-                - category: (string) One of: 'songs', 'entertainment', 'socialmedia', 'games', 'communication', 'help', 'other'
 
             STRICT RULES:
             1. Output ONLY valid JSON — no extra text, no explanations, no markdown.
@@ -391,7 +387,6 @@ def recommendation_agent(state):
             - search_query is empty
             7. Don't use same app in multiple recommendations.
             8. Each recommendation must be exactly 4 words, meaningful, and mood-impro
-            9. You MUST provide a 'category' for every app. For local apps, use their category from the list. For web apps, choose the best fit (e.g., 'songs' for Spotify, 'entertainment' for YouTube).
             
 
             Example of expected structure (do NOT include this in response):
@@ -543,7 +538,23 @@ def send_blocking_message(title, message):
     MB_OK = 0x0
     ctypes.windll.user32.MessageBoxW(0, message, title, MB_OK)
 
+# def task_execution_agent(state):
+#     recommended_output = state.recommendation
+#     recommended_options = state.recommendation_options
+    
 
+#     print("List of Recommendations in task_execution_agent: ", recommended_output)
+#     if "No action needed" not in recommended_output:
+
+#         chosen_recommendation = send_notification("Recommendations by EMOFI", recommended_output,recommended_options)
+#         print("Chosen recommendation: ", chosen_recommendation)
+#         if chosen_recommendation:
+#             print("Opening recommendations...")
+#             is_opened = open_recommendations(chosen_recommendation)
+#             state.executed = True
+#             return {
+#                     "executed": True,
+#                 }
 
 
 
@@ -557,97 +568,99 @@ def task_execution_agent(state):
         return {"executed": False}
     if "No action needed" not in recommended_output:
         state.executed = True
-       
+        # pickle_save()
+        # print("Task executed: ", app_state.executed)
+
+        # while pickle_load().executedApp == False:
+        #     print("waiting for reply..")
+        #     time.sleep(2)
+
+        # selectedRecommendation = pickle_load().selectedRecommendation
+        # selectedApp = pickle_load().selectedApp
+
+        # chosen_recommendation = {}
+
+        # for i in app_state.recommendations:
+        #     if(i['recommendation'] == selectedRecommendation):
+        #         for j in i['recommendation_options']:
+        #             if(j['app_name'] == selectedApp):
+        #                 chosen_recommendation = j
+        #                 break
+        #         break
+
+        # print("Executed task with recommendation: ", chosen_recommendation)
+
+        # app_state.reset()
+        # pickle_save()
 
     # --- RL logic starts here ---
 
     # --- 1. CAPTURE CURRENT CONTEXT ---
     # (This logic is from your rl_model_utils.py file)
-        now = datetime.now()
-        time_of_day = "night"
-        if 5 <= now.hour < 12: time_of_day = "morning"
-        elif 12 <= now.hour < 18: time_of_day = "afternoon"
-        day_of_week = "weekend" if now.weekday() >= 5 else "weekday"
+    now = datetime.now()
+    time_of_day = "night"
+    if 5 <= now.hour < 12: time_of_day = "morning"
+    elif 12 <= now.hour < 18: time_of_day = "afternoon"
+    day_of_week = "weekend" if now.weekday() >= 5 else "weekday"
 
+    
+    # This is the full context dictionary
+    current_context_dict = {
+        "emotion": average_emotion, 
+        "time_of_day": time_of_day, 
+        "day_of_week": day_of_week
+    }
+
+    state.context_at_recommendation = current_context_dict
+
+    print("[RL] Current context for ranking:", current_context_dict)
+
+
+    # --- 2. LOAD RL MODEL AND SCORE RECOMMENDATIONS ---
+    # This is the "ranking" step you mentioned
+    
+    # We must flatten the list of lists: [[App1, App2], [App3, App4], ...]
+    all_apps_to_rank = [app for sublist in recommended_options for app in sublist]
+    
+    try:
+        rl_model = load_bandit_model() # Loads "bandit_model.pkl"
         
-        # This is the full context dictionary
-        current_context_dict = {
-            "emotion": average_emotion, 
-            "time_of_day": time_of_day, 
-            "day_of_week": day_of_week
-        }
-
-        state.context_at_recommendation = current_context_dict
-
-        print("[RL] Current context for ranking:", current_context_dict)
-
-
-        # --- 2. LOAD RL MODEL AND SCORE RECOMMENDATIONS ---
-        # This is the "ranking" step you mentioned
-        
-        # We must flatten the list of lists: [[App1, App2], [App3, App4], ...]
-        all_apps_to_rank = [app for sublist in recommended_options for app in sublist]
-        
-        try:
-            # rl_model = load_bandit_model() # Loads "bandit_model.pkl"
-            current_file_path = os.path.abspath(__file__)
-            search_path = os.path.dirname(current_file_path)
-            project_root = None
-            for _ in range(5):
-                if os.path.isdir(os.path.join(search_path, 'Backend')):
-                    project_root = search_path
-                    break
-                search_path = os.path.dirname(search_path)
+        if rl_model.model_ready:
+            print("[RL] Ranking apps with trained model...")
+            context_vec = featurize_context(current_context_dict).reshape(1, -1)
             
-            if not project_root:
-                print("[RL] ERROR: Could not find project root to load model.")
-                raise FileNotFoundError("Project root not found.")
-                
-            # 2. Define the path to the model (inside the Backend folder)
-            backend_folder_path = os.path.join(project_root, "Backend")
-            model_file_path = os.path.join(backend_folder_path, "bandit_model.pkl")
-
-            # 3. Load the model using the full, absolute path
-            print(f"[RL] Loading model from: {model_file_path}")
-            rl_model = load_bandit_model(model_file_path)
-            # --- END: REPLACEMENT BLOCK ---
+            # Get action vectors for all apps
+            action_vec_list = [get_action_features(app)[1].reshape(1, -1) for app in all_apps_to_rank]
             
-            if rl_model.model_ready:
-                print("[RL] Ranking apps with trained model...")
-                context_vec = featurize_context(current_context_dict).reshape(1, -1)
-                
-                # Get action vectors for all apps
-                action_vec_list = [get_action_features(app)[1].reshape(1, -1) for app in all_apps_to_rank]
-                
-                # Get a score for each app
-                scores = rl_model.predict_score(context_vec, action_vec_list)
-                
-                # Pair apps with their scores and sort
-                scored_apps = sorted(zip(all_apps_to_rank, scores), key=lambda x: x[1], reverse=True)
-                
-                # --- This is your Top 3 logic ---
-                top_3_apps = [app for app, score in scored_apps[:3]]
-                
-                # We also need the original "recommendation" text
-                # This is complex. For simplicity, let's just create 3 new "recommendations"
-                recommended_output_ranked = [f"Suggestion {i+1}" for i in range(len(top_3_apps))]
-                # Group them back into lists of 2 (or just 1)
-                recommended_options_ranked = [[app] for app in top_3_apps]
+            # Get a score for each app
+            scores = rl_model.predict_score(context_vec, action_vec_list)
+            
+            # Pair apps with their scores and sort
+            scored_apps = sorted(zip(all_apps_to_rank, scores), key=lambda x: x[1], reverse=True)
+            
+            # --- This is your Top 3 logic ---
+            top_3_apps = [app for app, score in scored_apps[:3]]
+            
+            # We also need the original "recommendation" text
+            # This is complex. For simplicity, let's just create 3 new "recommendations"
+            recommended_output_ranked = [f"Suggestion {i+1}" for i in range(len(top_3_apps))]
+            # Group them back into lists of 2 (or just 1)
+            recommended_options_ranked = [[app] for app in top_3_apps]
 
-                print(f"[RL] Ranked Apps (Top 3): {[app.app_name for app in top_3_apps]}")
-                
-            else:
-                print("[RL] Model not trained, using first 3 apps from LLM.")
-                # Fallback if model isn't trained: just take the first 3 apps
-                recommended_output_ranked = recommended_output[:3]
-                recommended_options_ranked = recommended_options[:3]
-
-        except Exception as e:
-            print(f"[RL] Error during ranking: {e}. Using LLM default.")
+            print(f"[RL] Ranked Apps (Top 3): {[app.app_name for app in top_3_apps]}")
+            
+        else:
+            print("[RL] Model not trained, using first 3 apps from LLM.")
+            # Fallback if model isn't trained: just take the first 3 apps
             recommended_output_ranked = recommended_output[:3]
             recommended_options_ranked = recommended_options[:3]
 
-            # RL logic ends here
+    except Exception as e:
+        print(f"[RL] Error during ranking: {e}. Using LLM default.")
+        recommended_output_ranked = recommended_output[:3]
+        recommended_options_ranked = recommended_options[:3]
+
+        # RL logic ends here
     
         
     chosen_recommendation = send_notification(
@@ -686,9 +699,7 @@ def task_execution_agent(state):
             "open_app_handle": app_handle,
             "app_type": app_type,
             "continue_waiting": True,
-            "wait_start_time": time.time(),
-            "chosen_action": chosen_recommendation,
-            "context_at_recommendation": current_context_dict
+            "wait_start_time": time.time()
         }
     
     return {"executed": False}
@@ -777,89 +788,49 @@ def task_exit_agent(state):
         # 2. Assign reward
         reward = 1 if user_said_yes else 0
         print(f"[Agent] User feedback: {'Yes' if user_said_yes else 'No'} (Reward: {reward})")
-          # <-- 2nd: The AppRecommendation OBJECT
+
+        # 3. Log the data
+        log_training_data(
+            chosen_action,
+            context_at_recommendation,
+            reward
+        )
         
-        
-        try:
-            print("[Agent] Preparing to log data and trigger training...")
-
-            # --- 1. Find Project Root (Robustly) ---
-            current_file_path = os.path.abspath(__file__)
-            search_path = os.path.dirname(current_file_path)
-            project_root = None
-            for _ in range(5):  # Search up 5 levels
-                if os.path.isdir(os.path.join(search_path, 'Backend')):
-                    project_root = search_path
-                    break
-                search_path = os.path.dirname(search_path)
-            
-            if not project_root:
-                print(f"[Agent] FATAL ERROR: Could not find project root (the folder containing 'Backend'). Logging/Training skipped.")
-                # ... (rest of your return block for failure)
-                return {
-                    "executed": False,
-                    "action_time_start": None,
-                    "open_app_handle": None,
-                    "app_type": None,
-                    "continue_waiting": None,
-                    "wait_start_time": None,
-                    "chosen_action": None,
-                    "context_at_recommendation": None
-                }
-            
-            print(f"[Agent] Found Project Root: {project_root}")
-
-            # --- 2. DEFINE 'Backend' FOLDER PATH (THE CHANGE) ---
-            backend_folder_path = os.path.join(project_root, "Backend")
-            print(f"[Agent] Setting file paths to be inside: {backend_folder_path}")
-
-            # --- 3. DEFINE ABSOLUTE PATHS (inside Backend) ---
-            log_file_path = os.path.join(backend_folder_path, "rl_training_data.jsonl")
-            model_file_path = os.path.join(backend_folder_path, "bandit_model.pkl")
-
-            # --- 4. Log Data (using the new path) ---
-            log_training_data(
-                context_at_recommendation,  # The context DICT
-                chosen_action,              # The AppRecommendation OBJECT
-                reward,
-                log_file_path               # Pass the full path to the logger
-            )
-
-            # --- 5. Trigger Background Training (using new paths) ---
-            python_exe = sys.executable 
-            cmd_with_args = [
-                python_exe,
-                '-m', 'Backend.utils.train_rl_model',
-                log_file_path,
-                model_file_path
-            ]
-            
-            print(f"[Agent] Starting subprocess...")
-
-            # We still run from the 'project_root' (DesktopApp),
-            # because that's where 'python -m Backend...' needs to run from.
-            with open("trainer_stdout.log", "wb") as out, open("trainer_stderr.log", "wb") as err:
-                subprocess.Popen(cmd_with_args, stdout=out, stderr=err, cwd=project_root)
-            
-            print("[Agent] Training process started in background. Check 'trainer_stdout.log' for details.")
-
-        except Exception as e:
-            # Catch any errors during the logging/training process
-            print(f"[Agent] Error during logging/training step: {e}")
+        # ✅ START: ADD THIS BLOCK TO AUTO-TRAIN
         # ----------------------------------------------------
-        # ✅ END: REPLACE YOUR AUTO-TRAIN BLOCK WITH THIS
-    
-    # --- Reset State (This part is unchanged) ---
-    print("[Agent] Resetting state and finishing workflow.")
+        try:
+            print("[Agent] Triggering background model training...")
+            
+            # Find the python.exe in your *current* virtual environment
+            python_exe = sys.executable 
+            
+            # The path to your script FROM THE ROOT of your project
+            # (Assuming you run your main app from the 'DesktopApp' folder)
+            script_path = "Backend/utils/train_rl_model.py" 
+            
+            # Use Popen to run this in a new, separate process.
+            # This is NON-BLOCKING. The agent will not wait for it.
+            subprocess.Popen([python_exe, script_path])
+            
+        except Exception as e:
+            print(f"[Agent] Failed to start training script: {e}")
+        # ----------------------------------------------------
+        # ✅ END: ADD THIS BLOCK
+        # ----------------------------------------------------
+        
+        # (Optional) Trigger retraining
+        # We can call a non-blocking retrain function here
+        # trigger_retraining()
+    # Reset tracking flags
     return {
         "executed": False,
         "action_time_start": None,
         "open_app_handle": None,
         "app_type": None,
         "continue_waiting": None,
-        "wait_start_time": None,
-        "chosen_action": None,
-        "context_at_recommendation": None
+
+        "chosen_action": None, # Reset the new fields
+        "context_at_recommendation": None # Reset the new fields
     }
 
 

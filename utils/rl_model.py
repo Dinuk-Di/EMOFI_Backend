@@ -5,12 +5,11 @@ from datetime import datetime
 from typing import Dict, Any, Tuple, List
 from sklearn.linear_model import Ridge
 
-# Import the shared model definition
-from core.models import AppRecommendation
+from .models import AppRecommendation
 
-CONTEXT_DIM = 12  # Emotion (7), Time (3), Day (2)
-ACTION_DIM = 8    # is_local (1), Category (7)
-N_FEATURES = CONTEXT_DIM + ACTION_DIM # 12 + 8 = 20
+CONTEXT_DIM = 12
+ACTION_DIM = 8   
+N_FEATURES = CONTEXT_DIM + ACTION_DIM
 
 # --- RL Model Class ---
 
@@ -92,7 +91,12 @@ def get_context_features() -> (Dict[str, Any], np.ndarray):
 
 def get_action_features(app: AppRecommendation) -> (Dict[str, Any], np.ndarray):
     """Generates a feature dictionary and vector for a given action."""
-    cat_lower = app.category.lower()
+    action_category = 'other' # default
+    for cat_name in CATEGORY_MAP.keys():
+        if cat_name.lower() in app.app_name.lower():
+            action_category = cat_name
+            break
+    cat_lower = action_category
     
     action_dict = {
         "app_name": app.app_name,

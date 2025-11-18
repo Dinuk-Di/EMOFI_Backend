@@ -1,0 +1,8 @@
+[Trainer] Loading training data...
+[Trainer] Loading data from: D:\7th_semester\Final_year_project\Project Repo\Collaboration Repo\Clone Repo\Facial_Emotion_Recongnition\DesktopApp\Backend\rl_training_data.jsonl
+[Trainer] Training on 26 data points.
+[Trainer] Creating new model container.
+MockLinUCB initialized with 20 features.
+[Trainer] Fitting Ridge model...
+[Trainer] Model fitting complete.
+[Trainer] New model trained and saved successfully to 'D:\7th_semester\Final_year_project\Project Repo\Collaboration Repo\Clone Repo\Facial_Emotion_Recongnition\DesktopApp\Backend\bandit_model.pkl'!
