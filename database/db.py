@@ -65,17 +65,33 @@ def motivation_data_initial_add(conn):
     count = cursor.fetchone()[0]
 
     if count == 0:
-        with open(os.path.join(current_dir, '..', 'assets', 'quotes_dataset.csv'), 'r', encoding='utf-8') as file:
+        csv_path = os.path.join(current_dir, '..', 'assets', 'quotes_dataset.csv')
+        
+        # Check if file exists before opening
+        if not os.path.exists(csv_path):
+            print(f"[Warning] CSV file not found at: {csv_path}")
+            return
+
+        with open(csv_path, 'r', encoding='utf-8') as file:
             reader = csv.reader(file)
-            next(reader)
+            
+            try:
+                # Try to skip the header
+                next(reader)
+            except StopIteration:
+                print("[Warning] quotes_dataset.csv is empty. No quotes were added.")
+                return
+
             for row in reader:
+                # Ensure the row has enough columns before accessing index 0, 1, 2
                 if len(row) >= 3:
                     quote, author, tags = row[0], row[1], row[2]
                     cursor.execute("INSERT INTO motivations (author, quote, tags) VALUES (?, ?, ?)", (author, quote, tags))
+        
         conn.commit()
+        print("[Info] Motivation quotes added to the database.")
+    
     conn.close()
-
-    print("[Info] Motivation quotes added to the database.")
 
 def data_initialization():
     if not os.path.exists("assets"):

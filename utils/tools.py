@@ -16,6 +16,7 @@ from win32com.shell import shellcon
 import customtkinter as ctk
 import psutil
 import win32process
+import sys
 from database.db import get_app_data,get_connection
 
 
@@ -464,3 +465,10 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
             return False, None, None
             
     return False, None, None
+
+
+
+def resource_path(rel_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller bundle """
+    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+    return os.path.join(base_path, rel_path)

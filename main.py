@@ -5,6 +5,29 @@ from database.db import get_connection
 from database.db import initialize_db
 from ui.register import RegisterWindow
 from ui.dashboard import open_dashboard
+import os
+from customtkinter import CTk
+
+# --- To Get File Path ---
+try:
+    # Get the full path to this main.py file
+    current_file_path = os.path.abspath(__file__)
+    
+    # Get the directory it's in
+    current_dir = os.path.dirname(current_file_path)
+    
+    # Get the parent directory. The Project Root
+    project_root = os.path.dirname(current_dir)
+    
+    # Add the project root to the sys.path
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    
+    print(f"[Main App] Project root added to sys.path: {project_root}")
+except NameError:
+    print("[Main App] Could not auto-detect project root. Assuming CWD is correct.")
+    pass
+
 
 def is_do_not_disturb_enabled():
     """Check if Windows Do Not Disturb (Focus Assist) is enabled."""
