@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import time
 import threading
@@ -16,7 +17,6 @@ from win32com.shell import shellcon
 import customtkinter as ctk
 import psutil
 import win32process
-import sys
 from database.db import get_app_data,get_connection
 
 

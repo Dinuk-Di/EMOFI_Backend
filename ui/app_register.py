@@ -179,7 +179,6 @@ class AppRegister:
     def open_add_app_popup(self, category, parent_frame):
         popup = ctk.CTkToplevel(self.root)
         popup.title("Add Application")
-
         popup_width, popup_height = 350, 300
         screen_width = popup.winfo_screenwidth()
         screen_height = popup.winfo_screenheight()

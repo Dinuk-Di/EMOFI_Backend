@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from PIL import Image, ImageTk
+from PIL import Image
 import os
 from ui.pages.home import HomePage
 from ui.pages.setting import SettingsPage
@@ -66,12 +66,14 @@ class Dashboard:
 
         play_icon = self.create_icon_button(control_bar, "▶", "#4CAF50", command=lambda: self.controller.start())
         close_icon = self.create_icon_button(control_bar, "✖", "#F44336", command=lambda: self.controller.stop())
+        exercise_icon = self.create_icon_button(control_bar, "🏋️", "#2196F3", command=lambda: self.controller.exercise())
 
 
         # icons should be vertically aligned
         play_icon.pack(side="top", pady=5)
         close_icon.pack(side="top", pady=5)
-
+        exercise_icon.pack(side="top", pady=5)
+    
         # Initialize Pages
         self.pages["home"] = HomePage(self.content_frame)
         self.pages["settings"] = SettingsPage(self.content_frame)
@@ -108,10 +110,10 @@ class Dashboard:
             width=50,
             height=40,
             corner_radius=8,
-            font=("Arial", 8),  # Smaller text
+            font=("Arial", 8), 
             fg_color="#3a3a3a",
             hover_color="#4a4a4a",
-            compound="top",  # ✅ Icon above text
+            compound="top",
             command=lambda: [self.set_active(btn), command()]
         )
         return btn

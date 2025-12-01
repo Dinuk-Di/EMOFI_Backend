@@ -6,8 +6,7 @@ import time
 from langgraph.graph import StateGraph, END
 import requests
 from utils.desktop import capture_desktop
-from ui.notification import send_notification, execute_task
-import ollama
+from ui.notification import send_notification
 import ctypes
 from collections import Counter
 from typing import List, Optional
@@ -18,20 +17,23 @@ from dotenv import load_dotenv
 import os
 import json
 from pydantic import BaseModel, Field
-from winotify import Notification
-import threading
 import ctypes
 from openai import OpenAI
-import win32gui
-from old_utils.state import app_state, pickle_save, pickle_load
+from old_utils.state import app_state, pickle_save
 import winsound
 from datetime import datetime
-import numpy as np
-import subprocess  # For running the script
-import sys         # For finding the current Python executable
+import subprocess 
+import sys    
+import socket 
+
+# If threads are used
+import threading
+
+# If ollama is used
+import ollama
+
 from utils.rl_model import load_bandit_model,featurize_context,get_action_features
 from utils.for_rl import log_training_data, show_feedback_dialog
-
 from utils.models import AppRecommendation
 
 load_dotenv()
@@ -40,37 +42,61 @@ API_KEY = os.getenv("DEEPSEEK_API_KEY")
 QWEN_API_KEY = os.getenv("QWEN_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# --- Add this import at the top of your Python file ---
-import socket
 
-# --- Add this function definition somewhere accessible ---
-def send_signal_to_pi(signal_message: str):
-    """Sends a simple TCP signal to the Raspberry Pi."""
-    # ⚠️ CHANGE THIS to your Raspberry Pi's actual IP address
-    RPI_IP = '10.50.228.15'  
-    # ⚠️ USE THE SAME PORT AS THE PI SERVER
-    PORT = 65432         
+# --- To connect with raspberry pi ---
+# def send_signal_to_pi(signal_message: str):
+#     """Sends a simple TCP signal to the Raspberry Pi."""
+#     # Raspberry Pi's actual IP address
+#     RPI_IP = '10.50.228.15'  
+#     # THE SAME PORT AS THE PI SERVER
+#     PORT = 65432         
+    
+#     try:
+#         # Create a socket and connect
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:           
+#             s.settimeout(2.0)
+#             s.connect((RPI_IP, PORT))
+            
+#             s.sendall(signal_message.encode('utf-8'))
+#             print(f"[Signal Sender] Sent signal to RPi: '{signal_message}'")
+            
+#             # Optional: Wait for a short acknowledgement from the Pi
+#             # s.settimeout(1) # Set a timeout for receiving
+#             # ack = s.recv(1024)
+#             # print(f"[Signal Sender] RPi acknowledged: {ack.decode()}")
+
+#     except ConnectionRefusedError:
+#         print(f"[Signal Sender] ERROR: Connection refused. Is the RPi server running on {RPI_IP}:{PORT}?")
+#     except Exception as e:
+#         print(f"[Signal Sender] An error occurred while sending signal: {e}")
+
+
+# --- New HTTP POST version ---
+def send_signal_to_pi(payload: dict):
+    """Sends an HTTP POST request to the Raspberry Pi."""
+    # Raspberry Pi's actual IP address
+    RPI_IP = '10.50.228.36'  
+    # Update this to the port your HTTP server is listening on (e.g., 5000 for Flask)
+    PORT = 5000         
+    
+    url = f"http://{RPI_IP}:{PORT}/api/notification"
     
     try:
-        # Create a socket and connect
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            
-            s.settimeout(2.0)
-            s.connect((RPI_IP, PORT))
-            
-            s.sendall(signal_message.encode('utf-8'))
-            print(f"[Signal Sender] Sent signal to RPi: '{signal_message}'")
-            
-            # Optional: Wait for a short acknowledgement from the Pi
-            # s.settimeout(1) # Set a timeout for receiving
-            # ack = s.recv(1024)
-            # print(f"[Signal Sender] RPi acknowledged: {ack.decode()}")
+        # Send the dictionary directly using the 'json' parameter
+        # requests will automatically add Content-Type: application/json
+        response = requests.post(url, json=payload, timeout=2.0)
+        
+        if response.status_code == 200:
+            print(f"[Signal Sender] Successfully sent signal to RPi: {response.status_code}")
+        else:
+            print(f"[Signal Sender] RPi returned error: {response.status_code} - {response.text}")
 
-    except ConnectionRefusedError:
-        print(f"[Signal Sender] ERROR: Connection refused. Is the RPi server running on {RPI_IP}:{PORT}?")
+    except requests.exceptions.ConnectionError:
+        print(f"[Signal Sender] ERROR: Could not connect to {url}. Is the RPi server running?")
     except Exception as e:
         print(f"[Signal Sender] An error occurred while sending signal: {e}")
 
+# --- Agent System Implementation ---
 def run_agent_system(emotions):
     initial_state = AgentState(
         emotions=emotions,
@@ -86,9 +112,8 @@ def run_agent_system(emotions):
 
     )
     agent_workflow = create_workflow()
-    
-    # Increase recursion limit
-    config = {"recursion_limit": 100}  # Allow up to 100 steps
+
+    config = {"recursion_limit": 100}
     
     return agent_workflow.invoke(initial_state, config=config)
 
@@ -117,7 +142,7 @@ class AgentState(BaseModel):
     open_app_handle: Optional[Any] = None
     app_type: Optional[str] = None
     continue_waiting: Optional[bool] = None
-    wait_start_time: Optional[float] = None  # Track when waiting began
+    wait_start_time: Optional[float] = None
 
     chosen_action: Optional[AppRecommendation] = None           # The app the user clicked on
     context_at_recommendation: Optional[Dict] = None # The context (emotion, time)
@@ -279,7 +304,8 @@ def interrupt_check_agent(state):
             }
             
             # Send the JSON payload
-            send_signal_to_pi(json.dumps(signal_payload))  
+            # send_signal_to_pi(json.dumps(signal_payload))  
+            send_signal_to_pi(signal_payload)
         except Exception as e:
                 print(f"[Agent] Failed to send signal to RPi: {e}")
     

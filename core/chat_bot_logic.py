@@ -4,12 +4,9 @@ import os
 from dotenv import load_dotenv
 import json
 
-
-
 load_dotenv()
 
 QWEN_API_KEY = os.getenv("QWEN_API_KEY")
-
 
 # Initial Negative Emotion
 initial_emotion = "Stress"

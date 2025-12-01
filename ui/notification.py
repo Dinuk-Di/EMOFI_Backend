@@ -111,7 +111,8 @@ def send_notification(title, recommended_output, recommended_options, timeout=No
             "app_name": option.app_name,
             "app_url": option.app_url,
             "search_query": custom_query if custom_query else option.search_query,
-            "is_local": option.is_local
+            "is_local": option.is_local,
+            "category": option.category
         }
         root.destroy()
 

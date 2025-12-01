@@ -1,12 +1,12 @@
+import os
 import sys
 import subprocess
+from customtkinter import CTk
 from tkinter import messagebox
 from database.db import get_connection
 from database.db import initialize_db
 from ui.register import RegisterWindow
 from ui.dashboard import open_dashboard
-import os
-from customtkinter import CTk
 
 # --- To Get File Path ---
 try:
@@ -75,7 +75,6 @@ def main():
     # Connect to database and try to fetch user info
     conn = get_connection()
     cursor = conn.cursor()
-    initialize_db()
     cursor.execute("SELECT username, session_id FROM users WHERE id = 1")
     user_data = cursor.fetchone()
 
@@ -88,11 +87,8 @@ def main():
         print("User not found.")
 
     # Launch appropriate window based on user data
-    if username and session_id:
-        
+    if username and session_id:       
         open_dashboard(username)
-
-        # app.mainloop()
     else:
         # Open registration window if user not found
         root = CTk()

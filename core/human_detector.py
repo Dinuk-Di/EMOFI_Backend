@@ -19,3 +19,6 @@ def human_present(frame, conf_thres: float = 0.4, imgsz: int = 320) -> bool:
         if r.boxes is not None and len(r.boxes) > 0:
             return True
     return False
+
+
+
