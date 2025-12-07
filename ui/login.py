@@ -51,14 +51,31 @@ class LoginWindow:
         # Optional: Chatbot Button
         # ctk.CTkButton(frame, text="Open Chatbot", width=220, height=35, corner_radius=8, fg_color="#4CAF50", command=self.open_chatbot).pack(pady=15)
 
+    # def position_bottom_right(self):
+    #     self.root.update_idletasks()
+    #     width = 400
+    #     height = 450
+    #     screen_width = self.root.winfo_screenwidth()
+    #     screen_height = self.root.winfo_screenheight()
+    #     x = screen_width - width  - 110
+    #     y = screen_height - height - 220
+    #     self.root.geometry(f"{width}x{height}+{x}+{y}")
+    #     self.root.resizable(False, False)
+
     def position_bottom_right(self):
         self.root.update_idletasks()
+        self.root.attributes('-topmost', True)
         width = 400
         height = 450
+      
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        x = screen_width - width  - 110
-        y = screen_height - height - 220
+        # x = Screen Width - Window Width - Padding (e.g., 20px margin)
+        x = screen_width - width - 120
+        
+        # y = Screen Height - Window Height - Padding (e.g., 50px for taskbar)
+        y = screen_height - height - 170
+        
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         self.root.resizable(False, False)
 

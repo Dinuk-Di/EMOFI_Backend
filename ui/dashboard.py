@@ -83,16 +83,36 @@ class Dashboard:
         # Show Home by default
         self.show_page("home")
 
+    # def position_bottom_right(self):
+    #     self.root.update_idletasks()
+    #     width = 400
+    #     height = 450
+    #     screen_width = self.root.winfo_screenwidth()
+    #     screen_height = self.root.winfo_screenheight()
+    #     x = screen_width - 170
+    #     y = screen_height - height - 20
+    #     self.root.geometry(f"{width}x{height}+{x}+{y}")
+    #     self.root.resizable(False, False)
+
+
     def position_bottom_right(self):
         self.root.update_idletasks()
+        self.root.attributes('-topmost', True)
         width = 400
         height = 450
+      
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        x = screen_width - 170
-        y = screen_height - height - 20
+        # x = Screen Width - Window Width - Padding (e.g., 20px margin)
+        x = screen_width - width - 120
+        
+        # y = Screen Height - Window Height - Padding (e.g., 50px for taskbar)
+        y = screen_height - height - 170
+        
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         self.root.resizable(False, False)
+
+
 
     def load_icon(self, filename, size=(40, 40)):
         path = os.path.join(os.path.dirname(__file__), "..", "assets/res", filename)
