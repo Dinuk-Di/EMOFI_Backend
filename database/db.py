@@ -2,7 +2,33 @@
 import sqlite3
 import os
 from typing import List, Tuple
-DB_PATH = r"assets\app.db"
+import uuid
+import csv
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# # Navigate up one level and then into assets
+# db_path = os.path.join(current_dir, '..', 'assets', 'app.db')
+
+# # Normalize the path (handles the ..)
+# DB_PATH = os.path.normpath(db_path)
+
+def get_persistent_db_path():
+    # Detect base directory of app.exe or script
+    if getattr(sys, 'frozen', False):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Use user-specific folder for data storage
+    local_appdata = os.getenv('LOCALAPPDATA', app_dir)
+    emoify_data_dir = os.path.join(local_appdata, 'Emoify')
+    os.makedirs(emoify_data_dir, exist_ok=True)
+
+    # Permanent DB location
+    return os.path.join(emoify_data_dir, 'app.db')
+
+DB_PATH = get_persistent_db_path()
 
 def initialize_db():
     if not os.path.exists("assets"):

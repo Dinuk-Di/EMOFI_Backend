@@ -1,4 +1,5 @@
 customtkinter
+dlib
 Flask
 langchain-core
 langgraph
@@ -35,5 +36,6 @@ pywinauto
 sounddevice
 websockets
 pocketsphinx
+Flask
 waitress
 scikit-learn
