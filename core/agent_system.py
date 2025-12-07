@@ -25,8 +25,13 @@ from datetime import datetime
 import subprocess 
 import sys    
 import socket 
-from win11toast import toast
+import asyncio
+from desktop_notifier import DesktopNotifier, Button
+from pathlib import Path
+import os
 from threading import Event
+from win11toast import toast
+from utils.tools import resource_path
 
 # If threads are used
 import threading
@@ -268,14 +273,64 @@ def clean_think_tags(text):
 #     return {"continue_workflow": True}
     
 
-def show_notification_with_ok(title, message):
-    """Show Windows message box with OK/Cancel buttons"""
-    MB_OKCANCEL = 0x01
-    IDOK = 1
-    winsound.MessageBeep()
-    result = ctypes.windll.user32.MessageBoxW(0, message, title, MB_OKCANCEL)
-    return result == IDOK
+# def show_notification_with_ok(title, message):
+#     """Show Windows message box with OK/Cancel buttons"""
+#     MB_OKCANCEL = 0x01
+#     IDOK = 1
+#     winsound.MessageBeep()
+#     result = ctypes.windll.user32.MessageBoxW(0, message, title, MB_OKCANCEL)
+#     return result == IDOK
 
+
+# Set App ID so Windows shows the correct name/icon
+try:
+    myappid = 'mycompany.emofi.app.1.0' 
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+except Exception:
+    pass
+
+
+def show_notification_with_ok(title, message,timeout_seconds=120):
+    icon_path = Path(resource_path("assets/res/Icon.ico")) 
+
+    result_container = {"clicked": False}
+
+    async def async_notification_logic():
+        
+        notifier = DesktopNotifier(app_name="EMOFI")
+        
+        user_interaction_event = asyncio.Event()
+
+        def on_clicked_callback():
+            result_container["clicked"] = True
+            user_interaction_event.set()
+
+        try:
+            await notifier.request_authorisation()
+        except:
+            pass 
+
+        # 3. SEND NOTIFICATION
+        await notifier.send(
+            title=title,
+            message=message,
+            on_clicked=on_clicked_callback,
+            buttons=[Button("Yes, Proceed", on_clicked_callback)],
+            icon=icon_path
+        )
+
+        try:
+            await asyncio.wait_for(user_interaction_event.wait(), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            result_container["clicked"] = False
+
+    try:
+        asyncio.run(async_notification_logic())
+    except Exception as e:
+        print(f"[Notification] Error: {e}")
+        return False
+
+    return result_container["clicked"]
 
 
 def interrupt_check_agent(state):
@@ -574,8 +629,6 @@ def send_blocking_message(title, message):
 
 
 
-
-
 def task_execution_agent(state):
     recommended_output = state.recommendation
     recommended_options = state.recommendation_options
@@ -585,8 +638,7 @@ def task_execution_agent(state):
     if not recommended_output or "No action needed" in recommended_output:
         return {"executed": False}
     if "No action needed" not in recommended_output:
-        state.executed = True
-       
+        state.executed = True     
 
     # --- RL logic starts here ---
 
@@ -618,23 +670,7 @@ def task_execution_agent(state):
         all_apps_to_rank = [app for sublist in recommended_options for app in sublist]
         
         try:
-            # rl_model = load_bandit_model() # Loads "bandit_model.pkl"
-            current_file_path = os.path.abspath(__file__)
-            search_path = os.path.dirname(current_file_path)
-            project_root = None
-            for _ in range(5):
-                if os.path.isdir(os.path.join(search_path, 'Backend')):
-                    project_root = search_path
-                    break
-                search_path = os.path.dirname(search_path)
-            
-            if not project_root:
-                print("[RL] ERROR: Could not find project root to load model.")
-                raise FileNotFoundError("Project root not found.")
-                
-            # 2. Define the path to the model (inside the Backend folder)
-            backend_folder_path = os.path.join(project_root, "Backend")
-            model_file_path = os.path.join(backend_folder_path, "bandit_model.pkl")
+            model_file_path = resource_path("bandit_model.pkl")
 
             # 3. Load the model using the full, absolute path
             print(f"[RL] Loading model from: {model_file_path}")
@@ -785,7 +821,6 @@ def wait_for_close_agent(state):
 #     return {"executed": False, "action_time_start": None}
 
 def task_exit_agent(state):
-
     chosen_action = state.chosen_action
     context_at_recommendation = state.context_at_recommendation
     executed = state.executed
@@ -800,51 +835,20 @@ def task_exit_agent(state):
         # 1. Ask for feedback
         user_said_yes = show_feedback_dialog(
             "Feedback",
-            "Did this help improve your mood?"
+            "Did this help to improve your mood?"
         )
         
         # 2. Assign reward
         reward = 1 if user_said_yes else 0
         print(f"[Agent] User feedback: {'Yes' if user_said_yes else 'No'} (Reward: {reward})")
-          # <-- 2nd: The AppRecommendation OBJECT
-        
+          # <-- 2nd: The AppRecommendation OBJECT       
         
         try:
             print("[Agent] Preparing to log data and trigger training...")
 
-            # --- 1. Find Project Root (Robustly) ---
-            current_file_path = os.path.abspath(__file__)
-            search_path = os.path.dirname(current_file_path)
-            project_root = None
-            for _ in range(5):  # Search up 5 levels
-                if os.path.isdir(os.path.join(search_path, 'Backend')):
-                    project_root = search_path
-                    break
-                search_path = os.path.dirname(search_path)
-            
-            if not project_root:
-                print(f"[Agent] FATAL ERROR: Could not find project root (the folder containing 'Backend'). Logging/Training skipped.")
-                # ... (rest of your return block for failure)
-                return {
-                    "executed": False,
-                    "action_time_start": None,
-                    "open_app_handle": None,
-                    "app_type": None,
-                    "continue_waiting": None,
-                    "wait_start_time": None,
-                    "chosen_action": None,
-                    "context_at_recommendation": None
-                }
-            
-            print(f"[Agent] Found Project Root: {project_root}")
-
-            # --- 2. DEFINE 'Backend' FOLDER PATH (THE CHANGE) ---
-            backend_folder_path = os.path.join(project_root, "Backend")
-            print(f"[Agent] Setting file paths to be inside: {backend_folder_path}")
-
-            # --- 3. DEFINE ABSOLUTE PATHS (inside Backend) ---
-            log_file_path = os.path.join(backend_folder_path, "rl_training_data.jsonl")
-            model_file_path = os.path.join(backend_folder_path, "bandit_model.pkl")
+            log_file_path = resource_path("rl_training_data.jsonl")
+            model_file_path = resource_path("bandit_model.pkl")
+            # model_file_path = os.path.join(backend_folder_path, "bandit_model.pkl")
 
             # --- 4. Log Data (using the new path) ---
             log_training_data(
@@ -868,7 +872,7 @@ def task_exit_agent(state):
             # We still run from the 'project_root' (DesktopApp),
             # because that's where 'python -m Backend...' needs to run from.
             with open("trainer_stdout.log", "wb") as out, open("trainer_stderr.log", "wb") as err:
-                subprocess.Popen(cmd_with_args, stdout=out, stderr=err, cwd=project_root)
+                subprocess.Popen(cmd_with_args, stdout=out, stderr=err, cwd=os.path.dirname(os.path.dirname(log_file_path)))
             
             print("[Agent] Training process started in background. Check 'trainer_stdout.log' for details.")
 

@@ -18,7 +18,7 @@ from win32com.shell import shellcon
 import customtkinter as ctk
 import psutil
 import win32process
-from database.db import get_app_data,get_connection
+
 
 
 
@@ -227,6 +227,7 @@ def show_whatsapp_popup():
     cancel_btn.pack(side="left", padx=5)
     
 def open_recommendations(chosen_recommendation: dict) -> tuple:
+    from database.db import get_app_data,get_connection
     """
     Launches a local app or opens a web app with auto-close after 20 seconds
     Includes notification before closing
