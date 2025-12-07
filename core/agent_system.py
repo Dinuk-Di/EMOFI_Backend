@@ -25,6 +25,8 @@ from datetime import datetime
 import subprocess 
 import sys    
 import socket 
+from win11toast import toast
+from threading import Event
 
 # If threads are used
 import threading
@@ -274,6 +276,8 @@ def show_notification_with_ok(title, message):
     result = ctypes.windll.user32.MessageBoxW(0, message, title, MB_OKCANCEL)
     return result == IDOK
 
+
+
 def interrupt_check_agent(state):
     print("[Agent] Running interrupt_check_agent...")
     emotion = state.average_emotion
@@ -281,8 +285,7 @@ def interrupt_check_agent(state):
     
     # Always reset continue_workflow to False
     state.continue_workflow = False
-
-    
+   
     
     if emotion in negative_emotions:
         print(f"[Agent] Negative emotion detected: {emotion}")
