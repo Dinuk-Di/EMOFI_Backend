@@ -35,9 +35,7 @@ import traceback
 import os
 import requests
 from concurrent.futures import ThreadPoolExecutor, wait
-
 from winotify import Notification, audio
-
 from core.human_detector import human_present
 from core.emotion_detector import get_emotion
 # from core.sleepy_detector import check_sleepy

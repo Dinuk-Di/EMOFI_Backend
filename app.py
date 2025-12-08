@@ -5,15 +5,13 @@ from database.database import init_db, save_UserData, get_user_by_username, get_
 from database.db import get_connection, get_user_by_id, check_user_by_id, create_new_user_database, initialize_db
 from old_utils.state import app_state, pickle_save, pickle_load
 import threading
-#from main import start_app
-from customtkinter import CTk
-#from ui.register import AppRegister
 import sqlite3, os
 from openai import OpenAI
 from dotenv import load_dotenv
 from core.controller import AppController
 from concurrent.futures import ThreadPoolExecutor
 from waitress import serve
+from utils.tools import resource_path
 
 executor = ThreadPoolExecutor(max_workers=4)
 
@@ -23,13 +21,15 @@ load_dotenv()
 #app_mode = os.getenv("APP_MODE", "development")
 app_mode = "deploy"
 
-current_dir = os.path.dirname(os.path.abspath(__file__))  # C:/project/database
+# current_dir = os.path.dirname(os.path.abspath(__file__))  # C:/project/database
 
-# Navigate up one level and then into assets
-db_path = os.path.join(current_dir, 'assets', 'app.db')
+# # Navigate up one level and then into assets
+# db_path = os.path.join(current_dir, 'assets', 'app.db')
 
-# Normalize the path (handles the ..)
-database_file = os.path.normpath(db_path)
+# # Normalize the path (handles the ..)
+# database_file = os.path.normpath(db_path)
+
+database_file = resource_path('database/app.db')
 
 app = Flask(__name__)
 CORS(app)
@@ -237,17 +237,6 @@ def create_new_user():
 
     create_new_user_database(username, phonenumber, birthday)
     return jsonify({"message": "User created successfully"}), 201
-
-#new app configure endpoint
-@app.route('/api/addApp', methods=['POST'])
-def add_app():
-    data = request.json
-    user_name = data.get('user')
-
-    root = CTk()
-    AppRegister(root, user_name)
-    root.mainloop()
-    return jsonify({"message": "App registration window opened"}), 200
 
 @app.route('/api/getApps', methods=['GET'])
 def get_apps_database():
@@ -461,6 +450,25 @@ def chat():
         print(f"Error: {str(e)}")  # Log errors
         return jsonify({"error": str(e)}), 500
 
+# motivation data endpoints
+@app.route('/api/motivations', methods=['GET'])
+def get_motivations():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM motivations ORDER BY RANDOM() LIMIT 1")
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        motivation = {
+            "id": row[0],
+            "author": row[1],
+            "quote": row[2],
+            "tags": row[3]
+        }
+        return jsonify(motivation)
+    else:
+        return jsonify({"error": "No motivations found"}), 404
+
 # Java + backend connection
 @app.route('/api/start', methods=['POST'])
 def start_system():
@@ -540,4 +548,6 @@ if __name__ == '__main__':
     print("Initializing app...")
     #app.run(debug=True, port=5000, use_reloader=False)
     # use waitress instead of flask dev server
-    serve(app, host="127.0.0.1", port=5000)
+    serve(app, host="127.0.0.1", port=5050)
+
+
