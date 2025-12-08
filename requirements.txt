@@ -39,3 +39,6 @@ pocketsphinx
 Flask
 waitress
 scikit-learn
+pyinstaller
+desktop-notifier
+flask-cors

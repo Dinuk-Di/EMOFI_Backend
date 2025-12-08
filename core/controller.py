@@ -10,8 +10,7 @@ import traceback
 import os
 import requests
 from concurrent.futures import ThreadPoolExecutor, wait
-
-# --- Import your existing modules here ---
+from winotify import Notification, audio
 from core.human_detector import human_present
 from core.emotion_detector import get_emotion
 from core.hand_movement import detect_hand

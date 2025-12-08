@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 D:\7th_semester\Final_year_project\Project Repo\Collaboration Repo\Dinuk Repo\EMOFI_Backend\venv\Scripts\python.exe: Error while finding module specification for 'Backend.utils.train_rl_model' (ModuleNotFoundError: No module named 'Backend')
+=======
+D:\RuhunaNew\Academic\Robot_and_Backend\Backend_Setup\venv\Scripts\python.exe: Error while finding module specification for 'Backend.utils.train_rl_model' (ModuleNotFoundError: No module named 'Backend')
+>>>>>>> 8a8f916552d6670917292b4537304d336f33506e

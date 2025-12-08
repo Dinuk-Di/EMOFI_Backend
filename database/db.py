@@ -59,6 +59,17 @@ def get_user_by_id(user_id: int):
     conn.close()
     return user
 
+def check_user_by_id(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if(user):
+        return user
+    return None
+
 def get_user_by_credentials(username: str, password: str):
     conn = get_connection()
     cursor = conn.cursor()
@@ -99,9 +110,9 @@ def initial_settings():
     cursor = conn.cursor()
     cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "theme", "light"))
     cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "systemDisable", "0"))
-    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "recommendationTime", "30"))
-    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "resetTime", "50"))
-    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "appExecuteTime", "60"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "recommendationTime", "10"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "resetTime", "30"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "appExecuteTime", "30"))
     cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "soundLevel", "2"))
     cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "focusDetection", "0"))
     cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "handDetection", "0"))
@@ -177,6 +188,17 @@ def emotions(conn):
     conn.commit()
     
 
+def create_new_user_database(username: str, phonenumber: str, birthday: str):
+    user_id = 1
+    session_id = str(uuid.uuid4())
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO users (id, username, phonenumber, birthday, session_id)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, username, phonenumber, birthday, session_id))
+    conn.commit()
+    conn.close()
 
 
 # Add emotion function
