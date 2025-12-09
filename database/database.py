@@ -1,16 +1,12 @@
 import sqlite3
 import os
+from utils.tools import resource_path
 
 from flask import jsonify
 
-#database = r'assets\app.db'
-
-current_dir = os.path.dirname(os.path.abspath(__file__))  
-# Navigate up one level and then into assets
-db_path = os.path.join(current_dir, '..', 'assets', 'app.db')
 
 # Normalize the path (handles the ..)
-database = os.path.normpath(db_path)
+database = os.path.normpath(resource_path("assets/app.db"))
 
 def init_db():
     conn = sqlite3.connect(database)

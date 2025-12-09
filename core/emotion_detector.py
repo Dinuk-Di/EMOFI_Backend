@@ -28,8 +28,9 @@
 import cv2
 from ultralytics import YOLO
 from ultralytics.utils import ThreadingLocked
+from utils.tools import resource_path
 
-EMOTION_MODEL = YOLO("Models/best.pt")
+EMOTION_MODEL = YOLO(resource_path("Models/best.pt"))
 FACE_DETECTOR = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 EMOTION_CLASS_NAMES = ['Angry', 'Boring', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Stress', 'Suprise']
 

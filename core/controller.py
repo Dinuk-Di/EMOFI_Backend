@@ -152,7 +152,7 @@ class AppController:
         threading.Thread(target=self._send_exercise_signal, daemon=True).start()
 
     def _send_exercise_signal(self):
-        RPI_IP = '10.50.228.36' 
+        RPI_IP = '10.170.72.223' 
         PORT = 5000
         ENDPOINT = "/api/exercise"
         url = f"http://{RPI_IP}:{PORT}{ENDPOINT}"
@@ -160,13 +160,13 @@ class AppController:
         try:
             response = requests.post(url, json={}, timeout=2.0)
             if response.status_code == 200:
-                self.log(f"[Exercise] Success! Signal sent to {url}")
+                self.log(f"[Exercise] Success: {url}")
             else:
                 self.log(f"[Exercise] Failed. Pi responded: {response.status_code}")
         except requests.exceptions.ConnectionError:
             self.log(f"[Exercise] Error: Could not connect to {RPI_IP}")
         except Exception as e:
-            self.log(f"[Exercise] Error: {e}")
+            self.log(f"[Exercise] ERROR — continuing loop: {e}")
 
     def _warmup_models(self):
         if self._warmed:

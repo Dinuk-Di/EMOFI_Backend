@@ -1,16 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('assets', 'assets'), ('.env', '.'), ('core', 'core'), ('Models', 'Models'), ('database', 'database'), ('utils', 'utils')]
+datas = [('assets', 'assets'), ('Models', 'Models'), ('.env', '.')]
 binaries = []
-hiddenimports = []
+hiddenimports = ['database', 'database.db', 'sqlite3', 'winotify', 'win32api', 'win32con', 'win32gui']
 tmp_ret = collect_all('customtkinter')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('ultralytics')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

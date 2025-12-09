@@ -10,20 +10,19 @@ from ui.dashboard import open_dashboard
 
 # --- To Get File Path ---
 try:
-    # Get the full path to this main.py file
-    current_file_path = os.path.abspath(__file__)
-    
-    # Get the directory it's in
-    current_dir = os.path.dirname(current_file_path)
-    
-    # Get the parent directory. The Project Root
-    project_root = os.path.dirname(current_dir)
-    
-    # Add the project root to the sys.path
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    
-    print(f"[Main App] Project root added to sys.path: {project_root}")
+    # Determine if the application is a script file or frozen exe
+    if getattr(sys, 'frozen', False):
+        # If the app is running as a bundled exe, the temp path is in _MEIPASS
+        application_path = sys._MEIPASS
+    else:
+        # If running as a normal script
+        application_path = os.path.dirname(os.path.abspath(__file__))
+
+    # Add this path to system path so imports work
+    if application_path not in sys.path:
+        sys.path.insert(0, application_path)
+
+    print(f"[Main App] Running from: {application_path}")
 except NameError:
     print("[Main App] Could not auto-detect project root. Assuming CWD is correct.")
     pass

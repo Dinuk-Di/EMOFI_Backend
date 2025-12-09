@@ -82,7 +82,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 def send_signal_to_pi(payload: dict):
     """Sends an HTTP POST request to the Raspberry Pi."""
     # Raspberry Pi's actual IP address
-    RPI_IP = '10.50.228.36'  
+    RPI_IP = '10.170.72.223'  
     # Update this to the port your HTTP server is listening on (e.g., 5000 for Flask)
     PORT = 5000         
     
@@ -290,47 +290,150 @@ except Exception:
     pass
 
 
-def show_notification_with_ok(title, message,timeout_seconds=120):
-    icon_path = Path(resource_path("assets/res/Icon.ico")) 
+# def show_notification_with_ok(title, message,timeout_seconds=120):
+#     icon_path = Path(resource_path("assets/res/Icon.ico")) 
+
+#     result_container = {"clicked": False}
+
+#     async def async_notification_logic():
+        
+#         notifier = DesktopNotifier(app_name="EMOFI")
+        
+#         user_interaction_event = asyncio.Event()
+
+#         def on_clicked_callback():
+#             result_container["clicked"] = True
+#             user_interaction_event.set()
+
+#         try:
+#             await notifier.request_authorisation()
+#         except:
+#             pass 
+
+#         # 3. SEND NOTIFICATION
+#         await notifier.send(
+#             title=title,
+#             message=message,
+#             on_clicked=on_clicked_callback,
+#             buttons=[Button("Yes, Proceed", on_clicked_callback)],
+#             icon=icon_path
+#         )
+
+#         try:
+#             await asyncio.wait_for(user_interaction_event.wait(), timeout=timeout_seconds)
+#         except asyncio.TimeoutError:
+#             result_container["clicked"] = False
+
+#     try:
+#         asyncio.run(async_notification_logic())
+#     except Exception as e:
+#         print(f"[Notification] Error: {e}")
+#         return False
+
+#     return result_container["clicked"]
+
+def show_notification_with_ok(title, message, timeout_seconds=60):
+    try:
+        icon_path = Path(resource_path("assets/res/Icon.ico"))
+        if not icon_path.exists():
+            icon_path = None  # fallback
+    except:
+        icon_path = None
 
     result_container = {"clicked": False}
 
     async def async_notification_logic():
-        
-        notifier = DesktopNotifier(app_name="EMOFI")
-        
-        user_interaction_event = asyncio.Event()
+        """
+        Safe async notification block.
+        Any error inside here is caught and logged.
+        """
+        try:
+            notifier = DesktopNotifier(app_name="EMOFI")
+        except Exception as e:
+            print(f"[Notifier Init Error] {e}")
+            return False
 
-        def on_clicked_callback():
-            result_container["clicked"] = True
-            user_interaction_event.set()
+        user_event = asyncio.Event()
 
+        def clicked():
+            try:
+                result_container["clicked"] = True
+                user_event.set()
+            except:
+                pass  # never break
+
+        # --- REQUEST PERMISSION (SAFE) ---
         try:
             await notifier.request_authorisation()
-        except:
-            pass 
+        except Exception as e:
+            print(f"[Notifier Authorization Error] {e}")
 
-        # 3. SEND NOTIFICATION
-        await notifier.send(
-            title=title,
-            message=message,
-            on_clicked=on_clicked_callback,
-            buttons=[Button("Yes, Proceed", on_clicked_callback)],
-            icon=icon_path
-        )
-
+        # --- SEND NOTIFICATION (SAFE) ---
         try:
-            await asyncio.wait_for(user_interaction_event.wait(), timeout=timeout_seconds)
+            await notifier.send(
+                title=title,
+                message=message,
+                on_clicked=clicked,
+                buttons=[Button("Yes, Proceed", clicked)],
+                icon=icon_path
+            )
+        except Exception as e:
+            print(f"[Notifier Send Error] {e}")
+            return False
+
+        # --- WAIT FOR CLICK OR TIMEOUT ---
+        try:
+            await asyncio.wait_for(user_event.wait(), timeout=timeout_seconds)
         except asyncio.TimeoutError:
             result_container["clicked"] = False
+        except Exception as e:
+            print(f"[Notifier Wait Error] {e}")
+            return False
 
+        return result_container["clicked"]
+
+    # ---- RUN SAFELY (handles already-running event loop) ----
     try:
-        asyncio.run(async_notification_logic())
+        if not asyncio.get_event_loop().is_running():
+            return asyncio.run(async_notification_logic())
+        else:
+            # Running inside existing loop → create a new task
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(async_notification_logic())
+    except RuntimeError:
+        # If loop is running and cannot run_until_complete, create a new loop in a thread
+        try:
+            import threading
+
+            result_box = {"result": False}
+
+            def run_in_thread():
+                try:
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    result_box["result"] = new_loop.run_until_complete(async_notification_logic())
+                    new_loop.close()
+                except Exception as e:
+                    print(f"[Notifier Thread Error] {e}")
+
+            t = threading.Thread(target=run_in_thread)
+            t.daemon = True
+            t.start()
+            t.join(timeout_seconds + 2)
+
+            return result_box["result"]
+
+        except Exception as e:
+            print(f"[Notification FATAL Error] {e}")
+            return False
+
     except Exception as e:
-        print(f"[Notification] Error: {e}")
+        print(f"[Notification Wrapper Error] {e}")
         return False
 
-    return result_container["clicked"]
+    # Fallback
+    return False
+
 
 
 def interrupt_check_agent(state):
